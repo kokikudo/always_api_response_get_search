@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:flutter_typeahead/flutter_typeahead.dart';
 
 // freezed models
 import 'package:always_api_response_get_search/src/freezed_models/book_offset.dart';
@@ -68,39 +68,125 @@ final bookAtIndexProvider =
       .whenData((value) => value.books[offsetInPage]);
 });
 
+/// テスト
+final getBooksProvider =
+    StateNotifierProvider.autoDispose<GetBooksNotifier, List<Book>>(
+        (ref) => GetBooksNotifier(ref));
+
+class GetBooksNotifier extends StateNotifier<List<Book>> {
+  GetBooksNotifier(this._ref) : super([]);
+
+  final AutoDisposeProviderReference _ref;
+
+  Future<void> getBooks(title) async {
+    // キャンセルトークン設定
+    final cancelToken = CancelToken();
+    _ref.onDispose(cancelToken.cancel);
+
+    // 検索処理のプロバイダー
+    final repo = _ref.watch(repositoryProvider);
+    // 検索
+    final response =
+        await repo.fetchBooks(title: title, cancelToken: cancelToken);
+
+    // 再取得を防ぐため、stateを保存
+    _ref.maintainState = true;
+    state = response.books;
+  }
+}
+
+final bookStatusProvider = StateNotifierProvider<BookStatusNotifier, Book?>(
+    (ref) => BookStatusNotifier());
+
+class BookStatusNotifier extends StateNotifier<Book?> {
+  BookStatusNotifier() : super(null);
+
+  changeState(title, isbn, url) =>
+      state = Book(title: title, isbn: isbn, largeImageUrl: url);
+}
+
 class HomeScreen extends HookWidget {
   const HomeScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final watchBooksCount = useProvider(booksCountProvider);
-    final title = useProvider(titleProvider);
+    // final watchBooksCount = useProvider(booksCountProvider);
+    // final title = useProvider(titleProvider);
+    final books = useProvider(getBooksProvider);
+    final bookStatus = useProvider(bookStatusProvider);
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
-            Text('検索ワード: $title'),
-            TextField(
-              onChanged: (value) =>
-                  context.read(titleProvider.notifier).changeState(value),
+            TypeAheadFormField(
+              // TextFieldのデザイン
+              textFieldConfiguration: TextFieldConfiguration(
+                  decoration: InputDecoration(border: OutlineInputBorder())),
+              // List<Widget>の値が返る非同期処理
+              suggestionsCallback: (searchBookTitle) async {
+                await context
+                    .read(getBooksProvider.notifier)
+                    .getBooks(searchBookTitle);
+                return books;
+              },
+              itemBuilder: (context, book) {
+                book = book as Book;
+                return ListTile(
+                  leading: Image(
+                    image: NetworkImage(book.largeImageUrl),
+                  ),
+                  title: Text(book.title),
+                );
+              },
+              validator: (searchBookTitle) {
+                if (searchBookTitle!.isEmpty) {
+                  return '候補なし';
+                }
+              },
+              onSuggestionSelected: (book) {
+                book = book as Book;
+                context
+                    .read(bookStatusProvider.notifier)
+                    .changeState(book.title, book.isbn, book.largeImageUrl);
+              },
             ),
-            watchBooksCount.when(
-              data: (books) => Expanded(
-                child: ListView(
-                  children: books
-                      .map(
-                        (book) => Text(book.title),
+            Expanded(
+              child: Center(
+                child: bookStatus != null
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Image(
+                            image: NetworkImage(bookStatus.largeImageUrl),
+                          ),
+                          Text(bookStatus.title),
+                          Text(bookStatus.isbn),
+                        ],
                       )
-                      .toList(),
-                ),
+                    : Text('本のタイトルを入力してください。'),
               ),
-              loading: () => Center(
-                child: CircularProgressIndicator(),
-              ),
-              error: (err, stack) => Center(
-                child: Text(err.toString()),
-              ),
-            ),
+            )
+            // TextField(
+            //   onChanged: (value) =>
+            //       context.read(titleProvider.notifier).changeState(value),
+            // ),
+            // watchBooksCount.when(
+            //   data: (books) => Expanded(
+            //     child: ListView(
+            //       children: books
+            //           .map(
+            //             (book) => Text(book.title),
+            //           )
+            //           .toList(),
+            //     ),
+            //   ),
+            //   loading: () => Center(
+            //     child: CircularProgressIndicator(),
+            //   ),
+            //   error: (err, stack) => Center(
+            //     child: Text(err.toString()),
+            //   ),
+            // ),
           ],
         ),
       ),

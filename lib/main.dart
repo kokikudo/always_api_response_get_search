@@ -20,7 +20,7 @@ class MyApp extends StatelessWidget {
       builder: (context, child) {   // 背景をタップするとフォーカスが解除される
         return _Unfocus(child: child!);
       },
-      home: Portal(child: HomeScreen()),
+      home: HomeScreen(),
     );
   }
 }
