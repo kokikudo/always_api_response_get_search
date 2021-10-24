@@ -1,12 +1,8 @@
-// 本の検索処理その他諸々
-import 'dart:convert';
 
 import 'package:always_api_response_get_search/src/freezed_models/book.dart';
 import 'package:always_api_response_get_search/src/freezed_models/book_response.dart';
 import 'package:always_api_response_get_search/src/freezed_models/book_response_list.dart';
-import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'package:always_api_response_get_search/src/freezed_models/configuration.dart';
@@ -42,12 +38,13 @@ class SearchRepository {
 
     // DioでAPIにリクエスト
     const url =
-        'https://app.rakuten.co.jp/services/api/BooksTotal/Search/20170404';
+        'https://app.rakuten.co.jp/services/api/BooksBook/Search/20170404';
     final Map<String, Object?> queryParameters = {
       'format': 'json',
-      'keyword': title,
+      'title': title,
+      'size': 0,
       'booksGenreId': '001',
-      'hits': 10,
+      'hits': 5,
       'applicationId': configs.apiKey
     };
     final result = await _read(dioProvider).get<Map<String, Object?>>(url,

@@ -1,21 +1,35 @@
-import 'package:always_api_response_get_search/src/freezed_models/book.dart';
 import 'package:always_api_response_get_search/src/freezed_models/book_response.dart';
-import 'package:always_api_response_get_search/src/freezed_models/book_response_list.dart';
-import 'package:always_api_response_get_search/src/search_repository.dart';
-import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import 'package:always_api_response_get_search/src/freezed_models/configuration.dart';
+// 取得
+Future<BookResponse> _get(String title, CancelToken? cancelToken) async {
+  // APIキー取得。取得メソッドはFeatureProviderなので.futureをつける
+  const configs = "1081246808762900104";
+
+  // DioでAPIにリクエスト
+  const url =
+      'https://app.rakuten.co.jp/services/api/BooksBook/Search/20170404';
+  final Map<String, Object?> queryParameters = {
+    'format': 'json',
+    'title': title,
+    'size': 0,
+    'booksGenreId': '001',
+    'hits': 5,
+    'applicationId': configs
+  };
+  final result = await Dio().get<Map<String, Object?>>(url,
+      cancelToken: cancelToken, queryParameters: queryParameters);
+  // モデル化して返却
+  return BookResponse.fromJson(result.data!);
+}
 
 void main() {
   test('本のタイトルを入れるとレスポンスがリストになって返ってくるか', () async {
-    final title = '最強の睡眠';
-    final repo = useProvider(repositoryProvider);
-
-    final result = await repo.fetchBooks(title: title);
-    print(result);
+    final title = 'ゼロ';
+    final result = await _get(title, null);
+    for (var book in result.Items) {
+      print('${book.Item['title']}');
+    }
   });
 }
